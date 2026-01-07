@@ -1,0 +1,10 @@
+# Object files
+*.o
+
+# Output files
+*.out
+
+# Compiled executables
+test1
+test2
+
