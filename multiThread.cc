@@ -12,6 +12,9 @@
 #include <atomic>
 #include <memory>
 #include <chrono>
+#include <stdexcept>
+
+#include <cuda_runtime.h>
 
 using namespace cublas_test;
 
@@ -222,8 +225,15 @@ int main(int argc, char* argv[]) {
         std::cout << "Parent creating " << num_threads << " cuBLAS handles for child threads...\n";
         std::vector<std::unique_ptr<CublasMatMul>> thread_handles;
         thread_handles.reserve(num_threads);
+        std::vector<cudaStream_t> thread_streams(num_threads, 0);
         for (int t = 0; t < num_threads; ++t) {
             thread_handles.push_back(std::make_unique<CublasMatMul>());
+            cudaError_t err = cudaStreamCreateWithFlags(&thread_streams[t], cudaStreamNonBlocking);
+            if (err != cudaSuccess) {
+                throw std::runtime_error(std::string("cudaStreamCreateWithFlags failed: ") +
+                                         cudaGetErrorString(err));
+            }
+            thread_handles.back()->setStream(thread_streams[t]);
         }
         std::cout << "All handles created.\n";
 
@@ -247,6 +257,15 @@ int main(int argc, char* argv[]) {
 
         auto overall_end = std::chrono::high_resolution_clock::now();
         float overall_time_ms = std::chrono::duration<float, std::milli>(overall_end - overall_start).count();
+
+        // Handles are no longer needed after threads finish; destroy them before destroying streams.
+        thread_handles.clear();
+        for (auto& s : thread_streams) {
+            if (s) {
+                cudaStreamDestroy(s);
+                s = 0;
+            }
+        }
 
         // ============================================
         // PER-THREAD STATISTICS

@@ -9,7 +9,8 @@ CUDA_LIB  := $(CUDA_PATH)/lib64
 NVCC      := $(CUDA_PATH)/bin/nvcc
 CXX       := g++
 
-GPU_ARCH  := -gencode arch=compute_120,code=sm_120
+# GPU_ARCH  := -gencode arch=compute_120,code=sm_120
+GPU_ARCH  := -gencode arch=compute_70,code=sm_70
 
 # Compiler flags
 NVCC_FLAGS := -std=c++17 $(GPU_ARCH) -O3 -Xcompiler -Wall,-Wextra

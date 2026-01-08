@@ -5,6 +5,9 @@
 #include <vector>
 #include <string>
 
+// Needed for cudaStream_t in the public API.
+#include <cuda_runtime.h>
+
 namespace cublas_test {
 
 // Matrix initialization modes
@@ -73,6 +76,12 @@ public:
     void multiply(const Matrix& A, const Matrix& B, Matrix& C,
                   float alpha = 1.0f, float beta = 0.0f);
 
+    // Set a CUDA stream for this cuBLAS handle.
+    // If take_ownership is true, the stream will be destroyed in the destructor.
+    void setStream(cudaStream_t stream, bool take_ownership = false);
+
+    cudaStream_t getStream() const { return stream_; }
+
     // Get timing of last operation (in milliseconds)
     float getLastTimeMs() const { return last_time_ms_; }
 
@@ -81,6 +90,8 @@ public:
 
 private:
     void* cublas_handle_;
+    cudaStream_t stream_;
+    bool owns_stream_;
     float last_time_ms_;
     float last_gflops_;
 };

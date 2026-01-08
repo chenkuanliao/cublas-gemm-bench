@@ -162,7 +162,12 @@ void Matrix::print(const std::string& name, size_t max_rows, size_t max_cols) co
 // CublasMatMul Implementation
 // ============================================================================
 
-CublasMatMul::CublasMatMul() : cublas_handle_(nullptr), last_time_ms_(0), last_gflops_(0) {
+CublasMatMul::CublasMatMul()
+    : cublas_handle_(nullptr),
+      stream_(0),
+      owns_stream_(false),
+      last_time_ms_(0),
+      last_gflops_(0) {
     cublasHandle_t handle;
     CUBLAS_CHECK(cublasCreate(&handle));
     cublas_handle_ = handle;
@@ -175,6 +180,23 @@ CublasMatMul::~CublasMatMul() {
         cublasDestroy(static_cast<cublasHandle_t>(cublas_handle_));
         cublas_handle_ = nullptr;
     }
+    if (owns_stream_ && stream_) {
+        cudaStreamDestroy(stream_);
+        stream_ = 0;
+        owns_stream_ = false;
+    }
+}
+
+void CublasMatMul::setStream(cudaStream_t stream, bool take_ownership) {
+    if (owns_stream_ && stream_ && stream_ != stream) {
+        CUDA_CHECK(cudaStreamDestroy(stream_));
+    }
+
+    stream_ = stream;
+    owns_stream_ = take_ownership;
+
+    cublasHandle_t handle = static_cast<cublasHandle_t>(cublas_handle_);
+    CUBLAS_CHECK(cublasSetStream(handle, stream_));
 }
 
 void CublasMatMul::multiply(const Matrix& A, const Matrix& B, Matrix& C,
@@ -205,7 +227,7 @@ void CublasMatMul::multiply(const Matrix& A, const Matrix& B, Matrix& C,
     // To compute C = A * B in row-major, we compute C^T = B^T * A^T in column-major
     // This is equivalent to calling cublasSgemm with swapped A and B
     
-    CUDA_CHECK(cudaEventRecord(start));
+    CUDA_CHECK(cudaEventRecord(start, stream_));
     
     CUBLAS_CHECK(cublasSgemm(handle,
                              CUBLAS_OP_N,    // B not transposed
@@ -222,7 +244,7 @@ void CublasMatMul::multiply(const Matrix& A, const Matrix& B, Matrix& C,
                              C.deviceData(), // C in row-major
                              N));            // Leading dimension of C
     
-    CUDA_CHECK(cudaEventRecord(stop));
+    CUDA_CHECK(cudaEventRecord(stop, stream_));
     CUDA_CHECK(cudaEventSynchronize(stop));
     
     CUDA_CHECK(cudaEventElapsedTime(&last_time_ms_, start, stop));
