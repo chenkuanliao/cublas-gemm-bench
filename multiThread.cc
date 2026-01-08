@@ -10,6 +10,7 @@
 #include <thread>
 #include <mutex>
 #include <atomic>
+#include <memory>
 #include <chrono>
 
 using namespace cublas_test;
@@ -52,9 +53,10 @@ void threadWorker(int thread_id,
                   size_t M, size_t N, size_t K,
                   InitMode init_mode, float custom_value,
                   int iterations,
+                  CublasMatMul& matmul,
                   ThreadResult& result) {
     try {
-        // Each thread creates its own matrices and cuBLAS handle
+        // Each thread creates its own matrices but uses pre-created cuBLAS handle
         Matrix A(M, K);
         Matrix B(K, N);
         Matrix C(M, N);
@@ -66,8 +68,6 @@ void threadWorker(int thread_id,
         A.copyToDevice();
         B.copyToDevice();
         C.copyToDevice();
-
-        CublasMatMul matmul;
 
         result.thread_id = thread_id;
         result.times_ms.reserve(iterations);
@@ -218,16 +218,26 @@ int main(int argc, char* argv[]) {
                   << timed_count << " iterations each)\n";
         printSeparator();
 
+        // Parent thread creates all cuBLAS handles upfront (one per child thread)
+        std::cout << "Parent creating " << num_threads << " cuBLAS handles for child threads...\n";
+        std::vector<std::unique_ptr<CublasMatMul>> thread_handles;
+        thread_handles.reserve(num_threads);
+        for (int t = 0; t < num_threads; ++t) {
+            thread_handles.push_back(std::make_unique<CublasMatMul>());
+        }
+        std::cout << "All handles created.\n";
+
         std::vector<std::thread> threads;
         std::vector<ThreadResult> results(num_threads);
 
         auto overall_start = std::chrono::high_resolution_clock::now();
 
-        // Spawn child threads
+        // Spawn child threads, each gets its own pre-created handle
         for (int t = 0; t < num_threads; ++t) {
             threads.emplace_back(threadWorker, t, M, N, K, 
                                  init_mode, custom_value, 
-                                 timed_count, std::ref(results[t]));
+                                 timed_count, std::ref(*thread_handles[t]),
+                                 std::ref(results[t]));
         }
 
         // Wait for all threads to complete
