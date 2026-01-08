@@ -31,7 +31,7 @@ CUDA_OBJECTS := $(CUDA_SOURCES:.cu=.o)
 CXX_OBJECTS  := $(CXX_SOURCES:.cc=.o)
 
 # Targets
-TARGETS := basicPerf singleThread
+TARGETS := basicPerf singleThread multiThread
 
 # Default target
 .PHONY: all
@@ -44,6 +44,10 @@ basicPerf: basicPerf.o cublas_matmul.o
 # Build singleThread executable (warmup analysis)
 singleThread: singleThread.o cublas_matmul.o
 	$(NVCC) $(GPU_ARCH) -o $@ $^ $(LDFLAGS)
+
+# Build multiThread executable (multi-threaded test)
+multiThread: multiThread.o cublas_matmul.o
+	$(NVCC) $(GPU_ARCH) -o $@ $^ $(LDFLAGS) -lpthread
 
 # Compile CUDA source files
 %.o: %.cu cublas_matmul.h
@@ -67,6 +71,11 @@ run: basicPerf
 .PHONY: run2
 run2: singleThread
 	./singleThread
+
+# Run multiThread (multi-threaded test)
+.PHONY: run3
+run3: multiThread
+	./multiThread
 
 # Run singleThread with larger matrices for more visible warmup effects
 .PHONY: warmup-analysis
@@ -110,9 +119,11 @@ help:
 	@echo "  all             - Build all executables (default)"
 	@echo "  basicPerf       - Build the main test executable"
 	@echo "  singleThread    - Build the warmup analysis executable"
+	@echo "  multiThread     - Build the multi-threaded test executable"
 	@echo "  clean           - Remove build artifacts"
 	@echo "  run             - Build and run basicPerf with default options"
 	@echo "  run2            - Build and run singleThread with default options"
+	@echo "  run3            - Build and run multiThread with default options"
 	@echo "  warmup-analysis - Run detailed warmup analysis with singleThread"
 	@echo "  test-small      - Run a quick test with small matrices"
 	@echo "  benchmark       - Run benchmarks with various matrix sizes"
@@ -124,7 +135,9 @@ help:
 	@echo "Examples:"
 	@echo "  make                    # Build everything"
 	@echo "  make singleThread       # Build singleThread (warmup analysis)"
+	@echo "  make multiThread        # Build multiThread (multi-threaded test)"
 	@echo "  make run2               # Build and run singleThread"
+	@echo "  make run3               # Build and run multiThread"
 	@echo "  make warmup-analysis    # Run detailed warmup analysis"
 	@echo "  make DEBUG=1 basicPerf  # Build with debug symbols"
 	@echo "  make benchmark          # Run benchmarks"
