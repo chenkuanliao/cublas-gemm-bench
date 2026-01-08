@@ -1,5 +1,4 @@
 # Makefile for cuBLAS Matrix Multiplication Testing
-# Optimized for NVIDIA V100 GPU
 
 # CUDA paths - adjust if needed
 CUDA_PATH ?= /usr/local/cuda
@@ -10,8 +9,7 @@ CUDA_LIB  := $(CUDA_PATH)/lib64
 NVCC      := $(CUDA_PATH)/bin/nvcc
 CXX       := g++
 
-# V100 has compute capability 7.0
-GPU_ARCH  := -gencode arch=compute_70,code=sm_70
+GPU_ARCH  := -gencode arch=compute_120,code=sm_120
 
 # Compiler flags
 NVCC_FLAGS := -std=c++17 $(GPU_ARCH) -O3 -Xcompiler -Wall,-Wextra
@@ -26,25 +24,25 @@ endif
 
 # Source files
 CUDA_SOURCES := cublas_matmul.cu
-CXX_SOURCES  := test1.cc
+CXX_SOURCES  := basicPerf.cc
 
 # Object files
 CUDA_OBJECTS := $(CUDA_SOURCES:.cu=.o)
 CXX_OBJECTS  := $(CXX_SOURCES:.cc=.o)
 
 # Targets
-TARGETS := test1 test2
+TARGETS := basicPerf singleThread
 
 # Default target
 .PHONY: all
 all: $(TARGETS)
 
-# Build test1 executable
-test1: test1.o cublas_matmul.o
+# Build basicPerf executable
+basicPerf: basicPerf.o cublas_matmul.o
 	$(NVCC) $(GPU_ARCH) -o $@ $^ $(LDFLAGS)
 
-# Build test2 executable (warmup analysis)
-test2: test2.o cublas_matmul.o
+# Build singleThread executable (warmup analysis)
+singleThread: singleThread.o cublas_matmul.o
 	$(NVCC) $(GPU_ARCH) -o $@ $^ $(LDFLAGS)
 
 # Compile CUDA source files
@@ -62,46 +60,46 @@ clean:
 
 # Run tests
 .PHONY: run
-run: test1
-	./test1
+run: basicPerf
+	./basicPerf
 
-# Run test2 (warmup analysis)
+# Run singleThread (warmup analysis)
 .PHONY: run2
-run2: test2
-	./test2
+run2: singleThread
+	./singleThread
 
-# Run test2 with larger matrices for more visible warmup effects
+# Run singleThread with larger matrices for more visible warmup effects
 .PHONY: warmup-analysis
-warmup-analysis: test2
-	@echo "Running warmup analysis on V100..."
+warmup-analysis: singleThread
+	@echo "Running warmup analysis on NVIDIA GPU..."
 	@echo ""
 	@echo "=== 2048x2048 (5 warmup, 15 timed) ==="
-	./test2 -s 2048 -w 5 -r 15
+	./singleThread -s 2048 -w 5 -r 15
 	@echo ""
 	@echo "=== 4096x4096 (5 warmup, 15 timed) ==="
-	./test2 -s 4096 -w 5 -r 15
+	./singleThread -s 4096 -w 5 -r 15
 
 # Run a quick test with small matrices
 .PHONY: test-small
-test-small: test1
-	./test1 -s 64 -i ones -p -v
+test-small: basicPerf
+	./basicPerf -s 64 -i ones -p -v
 
 # Run benchmark with various sizes
 .PHONY: benchmark
-benchmark: test1
-	@echo "Running benchmarks on V100..."
+benchmark: basicPerf
+	@echo "Running benchmarks on NVIDIA GPU..."
 	@echo ""
 	@echo "=== 1024x1024 ==="
-	./test1 -s 1024 -i random -r 10 -w 3
+	./basicPerf -s 1024 -i random -r 10 -w 3
 	@echo ""
 	@echo "=== 2048x2048 ==="
-	./test1 -s 2048 -i random -r 10 -w 3
+	./basicPerf -s 2048 -i random -r 10 -w 3
 	@echo ""
 	@echo "=== 4096x4096 ==="
-	./test1 -s 4096 -i random -r 10 -w 3
+	./basicPerf -s 4096 -i random -r 10 -w 3
 	@echo ""
 	@echo "=== 8192x8192 ==="
-	./test1 -s 8192 -i random -r 10 -w 3
+	./basicPerf -s 8192 -i random -r 10 -w 3
 
 # Help
 .PHONY: help
@@ -110,12 +108,12 @@ help:
 	@echo ""
 	@echo "Targets:"
 	@echo "  all             - Build all executables (default)"
-	@echo "  test1           - Build the main test executable"
-	@echo "  test2           - Build the warmup analysis executable"
+	@echo "  basicPerf       - Build the main test executable"
+	@echo "  singleThread    - Build the warmup analysis executable"
 	@echo "  clean           - Remove build artifacts"
-	@echo "  run             - Build and run test1 with default options"
-	@echo "  run2            - Build and run test2 with default options"
-	@echo "  warmup-analysis - Run detailed warmup analysis with test2"
+	@echo "  run             - Build and run basicPerf with default options"
+	@echo "  run2            - Build and run singleThread with default options"
+	@echo "  warmup-analysis - Run detailed warmup analysis with singleThread"
 	@echo "  test-small      - Run a quick test with small matrices"
 	@echo "  benchmark       - Run benchmarks with various matrix sizes"
 	@echo "  help            - Show this help message"
@@ -125,9 +123,9 @@ help:
 	@echo ""
 	@echo "Examples:"
 	@echo "  make                    # Build everything"
-	@echo "  make test2              # Build test2 (warmup analysis)"
-	@echo "  make run2               # Build and run test2"
+	@echo "  make singleThread       # Build singleThread (warmup analysis)"
+	@echo "  make run2               # Build and run singleThread"
 	@echo "  make warmup-analysis    # Run detailed warmup analysis"
-	@echo "  make DEBUG=1 test1      # Build with debug symbols"
+	@echo "  make DEBUG=1 basicPerf  # Build with debug symbols"
 	@echo "  make benchmark          # Run benchmarks"
 

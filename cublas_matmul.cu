@@ -167,7 +167,6 @@ CublasMatMul::CublasMatMul() : cublas_handle_(nullptr), last_time_ms_(0), last_g
     CUBLAS_CHECK(cublasCreate(&handle));
     cublas_handle_ = handle;
     
-    // Set math mode for V100
     CUBLAS_CHECK(cublasSetMathMode(handle, CUBLAS_TENSOR_OP_MATH));
 }
 
