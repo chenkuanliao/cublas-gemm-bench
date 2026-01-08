@@ -5,6 +5,7 @@
 *.out
 
 # Compiled executables
-test1
-test2
+singleThread
+multiThread
+basicPerf
 
